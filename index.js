@@ -2,42 +2,45 @@ function pong() {
     var c;
     var ctx;
     var fps = 60;
-    var debug = false;
 
-    var ball = {
-        radius: 20,
-        initialSpeedX: 5,
-        initialSpeedY: 5,
-        speedXIncrease: 0.5,
-        speedYIncrease: 0.0,
-        maxSpeedX: 20,
-        maxSpeedY: 20,
-        color: 'white',
-        x: null,
-        y: null,
-        width: null,
-        height: null,
-        speedX: null,
-        speedY: null
+    var initialState = {
+        mouse: {
+            x: null,
+            y: null
+        },
+        ball: {
+            radius: 10,
+            speedXIncrease: 0.1,
+            speedYIncrease: 0.1,
+            maxSpeedX: 20,
+            maxSpeedY: 20,
+            color: 'white',
+            x: null,
+            y: null,
+            speedX: 5,
+            speedY: 5,
+            outOfBoundsLeft: null,
+            outOfBoundsRight: null
+        },
+        leftPaddle: {
+            x: null,
+            y: null,
+            width: 10,
+            height: 100,
+            color: 'white'
+        },
+        rightPaddle: {
+            x: null,
+            y: null,
+            width: 10,
+            height: 100,
+            color: 'white'
+        }
     };
+
+    var state = Object.assign({}, initialState);
 
     var paddlePadding = 5;
-
-    var leftPaddle = {
-        x: null,
-        y: null,
-        width: 10,
-        height: 100,
-        color: 'white'
-    };
-
-    var rightPaddle = {
-        x: null,
-        y: null,
-        width: 10,
-        height: 100,
-        color: 'white'
-    };
 
     function main() {
         c = document.getElementById('canvas');
@@ -46,39 +49,50 @@ function pong() {
     }
 
     function start() {
+        registerEventHandlers();
         resetGameState();
         draw();
 
         setInterval(function() {
             move();
+            checkGoal();
             draw();
         }, 1000 / fps);
     }
 
+    function registerEventHandlers() {
+        canvas.addEventListener('mousemove', function(e) {
+            state.mouse.x = e.clientX;
+            state.mouse.y = e.clientY;
+        });
+    }
+
     function resetGameState() {
-        ball.x = c.width / 2;
-        ball.y = c.height / 2;
-        ball.width = ball.radius * 2;
-        ball.height = ball.width;
-        ball.speedX = ball.initialSpeedX;
-        ball.speedY = ball.initialSpeedY;
+        state.ball.x = c.width / 2;
+        state.ball.y = c.height / 2;
+        state.ball.speedX = -initialState.ball.speedX;//initialState.ball.speedX * (Math.random() > 0.5 ? -1 : 1);
+        state.ball.speedY = initialState.ball.speedY * (Math.random() > 0.5 ? -1 : 1);
+        state.ball.outOfBoundsLeft = false;
+        state.ball.outOfBoundsRight = false;
 
-        leftPaddle.x = paddlePadding;
-        leftPaddle.y = c.height / 2 - (leftPaddle.height / 2);
+        state.leftPaddle.x = paddlePadding;
+        //state.leftPaddle.y = c.height / 2 - (initialState.leftPaddle.height / 2);
 
-        rightPaddle.x = c.width - paddlePadding - rightPaddle.width;
-        rightPaddle.y = c.height / 2 - (rightPaddle.height / 2);
+        state.rightPaddle.x = c.width - paddlePadding - initialState.rightPaddle.width;
+        state.rightPaddle.y = c.height / 2 - (initialState.rightPaddle.height / 2);
+        console.log('resetGameState', state);
     }
 
     function move() {
         moveBall();
+        movePaddle(state.leftPaddle);
     }
 
     function draw() {
         drawCanvas();
-        drawBall();
-        drawPaddle(leftPaddle);
-        drawPaddle(rightPaddle);
+        drawBall(state.ball);
+        drawPaddle(state.leftPaddle);
+        drawPaddle(state.rightPaddle);
     }
 
     function drawCanvas () {
@@ -86,43 +100,77 @@ function pong() {
         ctx.fillRect(0, 0, c.width, c.height);
     }
 
+    function checkGoal() {
+        if(state.ball.outOfBoundsLeft) {
+            console.log('Right player Goal');
+            resetGameState();
+        }
+        else if(state.ball.outOfBoundsRight) {
+            console.log('Left player goal');
+            resetGameState();
+        }
+    }
+
+    // PADDLE
+
     function drawPaddle(paddle) {
         ctx.fillStyle = paddle.color;
         ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
     }
 
-    function drawBall() {
+    function movePaddle(paddle) {
+        paddle.y = state.mouse.y;
+    }
+
+    // BALL
+
+    function drawBall(ball) {
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, ball.radius, 0, 2 * Math.PI);
         ctx.fillStyle = ball.color;
         ctx.fill();
-
-        if(debug) {
-            (function () {
-                var size = 1;
-                var top = ball.y - ball.radius;
-                var left = ball.x - ball.radius;
-
-                ctx.fillStyle = 'red';
-                ctx.fillRect(ball.x, top, size, ball.height);
-                ctx.fillRect(left, ball.y, ball.width, size);
-            })();   
-        }
     }
 
     function moveBall() {
-        if(ball.x >= c.width || ball.x <= 0) {
-            ball.speedX = -ball.speedX;
+        var ball = state.ball;
 
-            if(ball.speedX < 0 && ball.speedX > (-ball.maxSpeedX)) {
-                ball.speedX -= ball.speedXIncrease;
-            }
-            else if(ball.speedX < ball.maxSpeedX) {
-                ball.speedX += ball.speedXIncrease;
-            }
+        var withinRange = function(num, min, max) {
+            return num >= min && num <= max;
         }
 
-        if(ball.y >= c.height || ball.y <= 0) {
+        var top = ball.y - ball.radius;
+        var right = ball.x + ball.radius;
+        var bottom = ball.y + ball.radius;
+        var left = ball.x - ball.radius;
+
+        var topOut = !withinRange(top, 0, c.height) && withinRange(bottom, 0, c.height);
+        var rightOut = !withinRange(right, 0, c.width) && withinRange(left, 0, c.width);
+        var bottomOut = withinRange(top, 0, c.height) && !withinRange(bottom, 0, c.height);
+        var leftOut = withinRange(right, 0, c.width) && !withinRange(left, 0, c.width);
+
+        //var ballXOutOfBounds = leftOut || rightOut;
+        var ballYOutOfBounds = topOut || bottomOut; 
+
+        if(leftOut) {
+            ball.outOfBoundsLeft = true;
+        }
+        if(rightOut) {
+            ball.outOfBoundsRight = true;
+        }
+
+        // if(ballXOutOfBounds) {
+
+        //     ball.speedX = -ball.speedX;
+
+        //     if(ball.speedX < 0 && ball.speedX > (-ball.maxSpeedX)) {
+        //         ball.speedX -= ball.speedXIncrease;
+        //     }
+        //     else if(ball.speedX < ball.maxSpeedX) {
+        //         ball.speedX += ball.speedXIncrease;
+        //     }
+        // }
+
+        if(ballYOutOfBounds) {
             ball.speedY = -ball.speedY;
             
             if(ball.speedY < 0 && ball.speedY > (-ball.maxSpeedY)) {
@@ -135,6 +183,25 @@ function pong() {
 
         ball.x += ball.speedX;
         ball.y += ball.speedY;
+
+        // if(ball.x > c.width) {
+        //     ball.x = c.width - ball.radius;
+        //     ball.speedX = -ball.speedX;
+        // }
+        // if(ball.x < 0) {
+        //     ball.x = ball.radius;
+        //     ball.speedX = -ball.speedX;
+        // }
+        if(ball.y > c.height) {
+            ball.y = c.height - ball.radius;
+            ball.speedY = -ball.speedY;
+        }
+        if(ball.y < 0) {
+            ball.y = ball.radius;
+            ball.speedY = -ball.speedY;
+        }
+
+        state.ball = ball;
     }
 
     main();
