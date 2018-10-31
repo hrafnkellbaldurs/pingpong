@@ -10,8 +10,8 @@ function pong() {
         },
         ball: {
             radius: 10,
-            speedXIncrease: 0.1,
-            speedYIncrease: 0.1,
+            speedXIncrease: 1,
+            speedYIncrease: 1,
             maxSpeedX: 20,
             maxSpeedY: 20,
             color: 'white',
@@ -19,28 +19,32 @@ function pong() {
             y: null,
             speedX: 5,
             speedY: 5,
-            outOfBoundsLeft: null,
-            outOfBoundsRight: null
+            outOfBoundsLeft: false,
+            outOfBoundsRight: false
         },
         leftPaddle: {
             x: null,
             y: null,
             width: 10,
             height: 100,
-            color: 'white'
+            color: 'white',
+            padding: 5
         },
         rightPaddle: {
             x: null,
             y: null,
             width: 10,
             height: 100,
-            color: 'white'
+            color: 'white',
+            padding: -5
         }
     };
 
-    var state = Object.assign({}, initialState);
+    function deepClone(obj) {
+        return JSON.parse(JSON.stringify(obj));
+    }
 
-    var paddlePadding = 5;
+    var state = deepClone(initialState);
 
     function main() {
         c = document.getElementById('canvas');
@@ -61,31 +65,40 @@ function pong() {
     }
 
     function registerEventHandlers() {
-        canvas.addEventListener('mousemove', function(e) {
-            state.mouse.x = e.clientX;
-            state.mouse.y = e.clientY;
+        c.addEventListener('mousemove', function(e) {
+            var rect = c.getBoundingClientRect();
+            var documentElement = document.documentElement;
+            var mouseX = e.clientX - rect.left - documentElement.scrollLeft;
+            var mouseY = e.clientY - rect.top - documentElement.scrollTop;
+            
+            state.mouse.x = mouseX;
+            state.mouse.y = mouseY;
         });
     }
 
     function resetGameState() {
+        var oldState = deepClone(state);
+        state = deepClone(initialState);
+
+        state.mouse.x = oldState.mouse.x;
+        state.mouse.y = oldState.mouse.y;
+
         state.ball.x = c.width / 2;
         state.ball.y = c.height / 2;
-        state.ball.speedX = -initialState.ball.speedX;//initialState.ball.speedX * (Math.random() > 0.5 ? -1 : 1);
+        state.ball.speedX = initialState.ball.speedX * (Math.random() > 0.5 ? -1 : 1);
         state.ball.speedY = initialState.ball.speedY * (Math.random() > 0.5 ? -1 : 1);
-        state.ball.outOfBoundsLeft = false;
-        state.ball.outOfBoundsRight = false;
+        
+        state.leftPaddle.x = state.leftPaddle.padding;
+        state.leftPaddle.y = getPaddlePositionByMouse(state.leftPaddle, state.mouse);//c.height / 2 - (initialState.leftPaddle.height / 2);
 
-        state.leftPaddle.x = paddlePadding;
-        //state.leftPaddle.y = c.height / 2 - (initialState.leftPaddle.height / 2);
-
-        state.rightPaddle.x = c.width - paddlePadding - initialState.rightPaddle.width;
+        state.rightPaddle.x = c.width + state.rightPaddle.padding - initialState.rightPaddle.width;
         state.rightPaddle.y = c.height / 2 - (initialState.rightPaddle.height / 2);
-        console.log('resetGameState', state);
     }
 
     function move() {
         moveBall();
-        movePaddle(state.leftPaddle);
+        movePaddle(state.leftPaddle, state.mouse);
+        movePaddle(state.rightPaddle, { x: state.mouse.x, y: state.ball.y });
     }
 
     function draw() {
@@ -102,11 +115,9 @@ function pong() {
 
     function checkGoal() {
         if(state.ball.outOfBoundsLeft) {
-            console.log('Right player Goal');
             resetGameState();
         }
         else if(state.ball.outOfBoundsRight) {
-            console.log('Left player goal');
             resetGameState();
         }
     }
@@ -118,8 +129,24 @@ function pong() {
         ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
     }
 
-    function movePaddle(paddle) {
-        paddle.y = state.mouse.y;
+    function getPaddlePositionByMouse(paddle, mouse) {
+        return {
+            y: mouse.y - (paddle.height / 2),
+            x: paddle.x
+        };
+    }
+
+    function getPaddleBoundingRect(paddle) {
+        return {
+            top: paddle.y,
+            right: paddle.x + paddle.width,
+            bottom: paddle.y + paddle.height,
+            left: paddle.x
+        }
+    }
+
+    function movePaddle(paddle, mouse) {
+        paddle.y = getPaddlePositionByMouse(paddle, mouse).y;
     }
 
     // BALL
@@ -138,23 +165,23 @@ function pong() {
             return num >= min && num <= max;
         }
 
-        var top = ball.y - ball.radius;
-        var right = ball.x + ball.radius;
-        var bottom = ball.y + ball.radius;
-        var left = ball.x - ball.radius;
+        var ballTop = ball.y - ball.radius;
+        var ballRight = ball.x + ball.radius;
+        var ballBottom = ball.y + ball.radius;
+        var ballLeft = ball.x - ball.radius;
 
-        var topOut = !withinRange(top, 0, c.height) && withinRange(bottom, 0, c.height);
-        var rightOut = !withinRange(right, 0, c.width) && withinRange(left, 0, c.width);
-        var bottomOut = withinRange(top, 0, c.height) && !withinRange(bottom, 0, c.height);
-        var leftOut = withinRange(right, 0, c.width) && !withinRange(left, 0, c.width);
+        var ballTopOut = !withinRange(ballTop, 0, c.height) && withinRange(ballBottom, 0, c.height);
+        var ballRightOut = !withinRange(ballRight, 0, c.width) && withinRange(ballLeft, 0, c.width);
+        var ballBottomOut = withinRange(ballTop, 0, c.height) && !withinRange(ballBottom, 0, c.height);
+        var ballLeftOut = withinRange(ballRight, 0, c.width) && !withinRange(ballLeft, 0, c.width);
 
-        //var ballXOutOfBounds = leftOut || rightOut;
-        var ballYOutOfBounds = topOut || bottomOut; 
+        //var ballXOutOfBounds = ballLeftOut || ballRightOut;
+        var ballYOutOfBounds = ballTopOut || ballBottomOut; 
 
-        if(leftOut) {
+        if(ballLeftOut) {
             ball.outOfBoundsLeft = true;
         }
-        if(rightOut) {
+        if(ballRightOut) {
             ball.outOfBoundsRight = true;
         }
 
@@ -199,6 +226,25 @@ function pong() {
         if(ball.y < 0) {
             ball.y = ball.radius;
             ball.speedY = -ball.speedY;
+        }
+
+
+        // Paddle detection
+        var leftPaddle = state.leftPaddle;
+        var rightPaddle = state.rightPaddle;
+        var leftPaddleRect = getPaddleBoundingRect(leftPaddle);
+        var rightPaddleRect = getPaddleBoundingRect(rightPaddle);
+
+        if(ballLeft < leftPaddleRect.right && ballTop > leftPaddleRect.top && ballBottom < leftPaddleRect.bottom) {
+            console.log('ball hit');
+            ball.speedX = -ball.speedX;
+            ball.x = leftPaddleRect.right + ball.radius;
+        }
+
+        if(ballRight > rightPaddleRect.left && ballTop > rightPaddleRect.top && ballBottom < rightPaddleRect.bottom) {
+            console.log('ball hit');
+            ball.speedX = -ball.speedX;
+            ball.x = rightPaddleRect.left - ball.radius;
         }
 
         state.ball = ball;

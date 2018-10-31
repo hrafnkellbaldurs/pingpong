@@ -3,6 +3,12 @@ body {
     padding: 0;
 }
 
+.canvasContainer {
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 #canvas {
-    
 }
