@@ -80,6 +80,16 @@ function pong() {
     }
 
     function registerEventHandlers() {
+        function onWindowResize() {
+            var width = document.body.clientWidth;
+            var height = document.body.clientHeight;
+            c.width = width;
+            c.height = height;
+        }
+        window.addEventListener('resize', onWindowResize);
+        onWindowResize();
+        
+        
         c.addEventListener('mousemove', function(e) {
             var rect = c.getBoundingClientRect();
             var documentElement = document.documentElement;
@@ -164,7 +174,7 @@ function pong() {
             drawWinner();
         }
         else {
-            drawCenterLine();
+            drawNet();
             drawBall(state.ball);
             drawPaddle(state.p1.paddle);
             drawPaddle(state.p2.paddle);
@@ -177,15 +187,44 @@ function pong() {
         ctx.fillRect(0, 0, c.width, c.height);
     }
 
-    function drawCenterLine() {
-        ctx.setLineDash([10, 15]);
+    function drawNet() {
+        var dashHeight = 10;
+        var dashWidth = 2;
+        var dashDistance = 15;
+        var color = 'white';
+        var canvasXCenter = c.width / 2;
+        
+        if(!ctx.setLineDash) {
+            lineDashPolyFill(dashHeight, dashDistance, dashWidth, color);
+        }
+        else {
+            ctx.setLineDash([dashHeight, dashDistance]);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = dashWidth;
+            ctx.beginPath();
+            ctx.moveTo(canvasXCenter, dashHeight / 2);
+            ctx.lineTo(canvasXCenter, c.height);
+            ctx.stroke();
+        }
 
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(c.width / 2, 0);
-        ctx.lineTo(c.width / 2, c.height);
-        ctx.stroke();
+        function lineDashPolyFill(dashHeight, dashDistance, dashWidth, color) {
+            var amount = c.height / (dashHeight + dashDistance);
+            var canvasXCenter = c.width / 2;
+            var dashStart;
+            var dashEnd;
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = dashWidth;
+
+            for (var i = 0; i < amount; i++) {
+                dashStart = i * (dashHeight + dashDistance);
+                dashEnd = dashStart + dashHeight;
+
+                ctx.moveTo(canvasXCenter, dashStart);
+                ctx.lineTo(canvasXCenter, dashEnd);
+                ctx.stroke();
+            };
+        }
     }
 
     function drawScore(score) {
@@ -199,10 +238,10 @@ function pong() {
         var message;
 
         if(state.p1.isWinner) {
-            message = 'p1 is winner with ' + state.score.p1 + ' points.';
+            message = 'Player won with ' + state.score.p1 + ' points.';
         }
         if(state.p2.isWinner) {
-            message = 'p2 is winner with ' + state.score.p2 + ' points.';
+            message = 'Computer won with ' + state.score.p2 + ' points.';
         }
 
         if(message) {
