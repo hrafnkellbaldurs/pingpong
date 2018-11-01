@@ -13,8 +13,8 @@ function pong() {
             radius: 10,
             speedXIncrease: 1,
             speedYIncrease: 1,
-            maxSpeedX: 20,
-            maxSpeedY: 20,
+            maxSpeedX: 40,
+            maxSpeedY: 40,
             color: 'white',
             x: null,
             y: null,
@@ -32,7 +32,8 @@ function pong() {
                 hitBoxHeightRatio: 0.2,
                 color: 'white',
                 padding: 5
-            }
+            },
+            isWinner: false
         },
         p2: {
             paddle: {
@@ -43,12 +44,15 @@ function pong() {
                 hitBoxHeightRatio: 0.2,
                 color: 'white',
                 padding: -5
-            }
+            },
+            isWinner: false
         },
         score: {
+            winningScore: 5,
             p1: 0,
             p2: 0
-        }
+        },
+        showingWinScreen: false
     };
 
     function deepClone(obj) {
@@ -70,7 +74,7 @@ function pong() {
 
         setInterval(function() {
             move();
-            checkGoal();
+            updateScore();
             draw();
         }, 1000 / fps);
     }
@@ -85,47 +89,87 @@ function pong() {
             state.mouse.x = mouseX;
             state.mouse.y = mouseY;
         });
+
+        c.addEventListener('click', function(e) {
+            if(state.showingWinScreen) {
+                restartGame();
+            }
+        });
+    }
+
+    function resetBall() {
+        var ball = deepClone(initialState.ball);
+        
+        ball.x = c.width / 2;
+        ball.y = c.height / 2;
+        ball.speedX *= Math.random() > 0.5 ? -1 : 1;
+        ball.speedY *= Math.random() > 0.5 ? -1 : 1;
+
+        if(debug) {
+            ball.speedX = -5
+            ball.speedY = 0;
+        }
+
+        state.ball = ball;
+    }
+
+    function restartGame() {
+        resetGameState();
+        state.p1.isWinner = false;
+        state.p2.isWinner = false;
+        state.score = deepClone(initialState.score);
+        state.showingWinScreen = false;
+    }
+
+    function resetMouse() {
+        var oldMouse = deepClone(state.mouse);
+        state.mouse.x = oldMouse.x;
+        state.mouse.y = oldMouse.y;
+    }
+
+    function resetPaddles() {
+        state.p1.paddle.x = state.p1.paddle.padding;
+        state.p1.paddle.y = getPaddlePositionByMouse(state.p1.paddle, state.mouse);
+
+        state.p2.paddle.x = c.width + state.p2.paddle.padding - initialState.p2.paddle.width;
+        state.p2.paddle.y = c.height / 2 - (initialState.p2.paddle.height / 2);
     }
 
     function resetGameState() {
         var oldState = deepClone(state);
         state = deepClone(initialState);
 
-        state.mouse.x = oldState.mouse.x;
-        state.mouse.y = oldState.mouse.y;
-
-        state.ball.x = c.width / 2;
-        state.ball.y = c.height / 2;
-        state.ball.speedX = initialState.ball.speedX * (Math.random() > 0.5 ? -1 : 1);
-        state.ball.speedY = initialState.ball.speedY * (Math.random() > 0.5 ? -1 : 1);
-        
-        state.p1.paddle.x = state.p1.paddle.padding;
-        state.p1.paddle.y = getPaddlePositionByMouse(state.p1.paddle, state.mouse);
-
-        state.p2.paddle.x = c.width + state.p2.paddle.padding - initialState.p2.paddle.width;
-        state.p2.paddle.y = c.height / 2 - (initialState.p2.paddle.height / 2);
+        resetMouse();
+        resetBall();
+        resetPaddles();
 
         state.score = oldState.score;
-
-        if(debug) {
-            state.ball.speedX = -5
-            state.ball.speedY = 0;
-        }
+        state.p1.isWinner = oldState.p1.isWinner;
+        state.p2.isWinner = oldState.p2.isWinner;
+        state.showingWinScreen = oldState.showingWinScreen;
     }
 
     function move() {
-        moveBall();
-        movePaddle(state.p1.paddle, state.mouse);
-        //movePaddle(state.p2.paddle, { x: state.mouse.x, y: state.ball.y });
-        getComputerMovement(state.p2.paddle, state.ball);
+        if(!state.showingWinScreen) {
+            moveBall();
+            movePaddle(state.p1.paddle, state.mouse);
+            getComputerMovement(state.p2.paddle, state.ball);
+        }
     }
 
     function draw() {
         drawCanvas();
-        drawBall(state.ball);
-        drawPaddle(state.p1.paddle);
-        drawPaddle(state.p2.paddle);
-        drawScore(state.score);
+
+        if(state.showingWinScreen) {
+            drawWinner();
+        }
+        else {
+            drawCenterLine();
+            drawBall(state.ball);
+            drawPaddle(state.p1.paddle);
+            drawPaddle(state.p2.paddle);
+            drawScore(state.score);
+        }       
     }
 
     function drawCanvas() {
@@ -133,21 +177,72 @@ function pong() {
         ctx.fillRect(0, 0, c.width, c.height);
     }
 
-    function drawScore(score) {
-        ctx.font = '30px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(score.p1 + ' - ' + score.p2, c.width / 2, 40);
+    function drawCenterLine() {
+        ctx.setLineDash([10, 15]);
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(c.width / 2, 0);
+        ctx.lineTo(c.width / 2, c.height);
+        ctx.stroke();
     }
 
-    function checkGoal() {
-        if(state.ball.outOfBoundsLeft) {
-            state.score.p2++;
+    function drawScore(score) {
+        ctx.fillStyle = 'white';
+        ctx.font = '30px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(score.p1 + '       ' + score.p2, c.width / 2, 40);
+    }
+
+    function drawWinner() {
+        var message;
+
+        if(state.p1.isWinner) {
+            message = 'p1 is winner with ' + state.score.p1 + ' points.';
+        }
+        if(state.p2.isWinner) {
+            message = 'p2 is winner with ' + state.score.p2 + ' points.';
+        }
+
+        if(message) {
+            ctx.fillStyle = 'white';
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(message, c.width / 2, c.height / 2, c.width);
+
+            ctx.font = '30px Arial';
+            ctx.fillText('Click to play again', c.width / 2, (c.height / 2) + 35, c.width);
+        }
+    }
+
+    function updateScore() {
+        var score = getScoreState();
+        var scoreChanged = score.p1 !== state.score.p1 || score.p2 !== state.score.p2;
+
+        if(scoreChanged) {
+            state.score = score;
+
+            state.p1.isWinner = score.p1 >= score.winningScore;
+            state.p2.isWinner = score.p2 >= score.winningScore;
+            
+            state.showingWinScreen = state.p1.isWinner === true || state.p2.isWinner === true;
+
             resetGameState();
+        }
+    }
+
+    function getScoreState() {
+        var score = deepClone(state.score);
+        
+        if(state.ball.outOfBoundsLeft) {
+            score.p2++;
         }
         else if(state.ball.outOfBoundsRight) {
-            state.score.p1++;
-            resetGameState();
+            score.p1++;
         }
+
+        return score;
     }
 
     // PADDLE
@@ -246,6 +341,13 @@ function pong() {
         //     }
         // }
 
+        if(ballTopOut) {
+            ball.y = ball.radius;
+        }
+        else if(ballBottomOut) {
+            ball.y = c.height - ball.radius;
+        }
+
         if(ballYOutOfBounds) {
             ball.speedY = -ball.speedY;
             
@@ -288,7 +390,7 @@ function pong() {
         
         var onBallHitPaddle = function(paddle, paddleEdge, offset) {
             var deltaY = ball.y - (paddle.y + (paddle.height / 2));
-            ball.speedY = deltaY * 0.3;
+            ball.speedY = deltaY * 0.4;
 
             if(ball.speedY > ball.maxSpeedY) {
                 ball.speedY = ball.maxSpeedY;
