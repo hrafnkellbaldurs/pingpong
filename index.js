@@ -2,6 +2,7 @@ function pong() {
     var c;
     var ctx;
     var fps = 60;
+    var debug = false;
 
     var initialState = {
         mouse: {
@@ -22,21 +23,31 @@ function pong() {
             outOfBoundsLeft: false,
             outOfBoundsRight: false
         },
-        leftPaddle: {
-            x: null,
-            y: null,
-            width: 10,
-            height: 100,
-            color: 'white',
-            padding: 5
+        p1: {
+            paddle: {
+                x: null,
+                y: null,
+                width: 10,
+                height: 100,
+                hitBoxHeightRatio: 0.2,
+                color: 'white',
+                padding: 5
+            }
         },
-        rightPaddle: {
-            x: null,
-            y: null,
-            width: 10,
-            height: 100,
-            color: 'white',
-            padding: -5
+        p2: {
+            paddle: {
+                x: null,
+                y: null,
+                width: 10,
+                height: 100,
+                hitBoxHeightRatio: 0.2,
+                color: 'white',
+                padding: -5
+            }
+        },
+        score: {
+            p1: 0,
+            p2: 0
         }
     };
 
@@ -88,43 +99,81 @@ function pong() {
         state.ball.speedX = initialState.ball.speedX * (Math.random() > 0.5 ? -1 : 1);
         state.ball.speedY = initialState.ball.speedY * (Math.random() > 0.5 ? -1 : 1);
         
-        state.leftPaddle.x = state.leftPaddle.padding;
-        state.leftPaddle.y = getPaddlePositionByMouse(state.leftPaddle, state.mouse);//c.height / 2 - (initialState.leftPaddle.height / 2);
+        state.p1.paddle.x = state.p1.paddle.padding;
+        state.p1.paddle.y = getPaddlePositionByMouse(state.p1.paddle, state.mouse);
 
-        state.rightPaddle.x = c.width + state.rightPaddle.padding - initialState.rightPaddle.width;
-        state.rightPaddle.y = c.height / 2 - (initialState.rightPaddle.height / 2);
+        state.p2.paddle.x = c.width + state.p2.paddle.padding - initialState.p2.paddle.width;
+        state.p2.paddle.y = c.height / 2 - (initialState.p2.paddle.height / 2);
+
+        state.score = oldState.score;
+
+        if(debug) {
+            state.ball.speedX = -5
+            state.ball.speedY = 0;
+        }
     }
 
     function move() {
         moveBall();
-        movePaddle(state.leftPaddle, state.mouse);
-        movePaddle(state.rightPaddle, { x: state.mouse.x, y: state.ball.y });
+        movePaddle(state.p1.paddle, state.mouse);
+        //movePaddle(state.p2.paddle, { x: state.mouse.x, y: state.ball.y });
+        getComputerMovement(state.p2.paddle, state.ball);
     }
 
     function draw() {
         drawCanvas();
         drawBall(state.ball);
-        drawPaddle(state.leftPaddle);
-        drawPaddle(state.rightPaddle);
+        drawPaddle(state.p1.paddle);
+        drawPaddle(state.p2.paddle);
+        drawScore(state.score);
     }
 
-    function drawCanvas () {
+    function drawCanvas() {
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, c.width, c.height);
     }
 
+    function drawScore(score) {
+        ctx.font = '30px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(score.p1 + ' - ' + score.p2, c.width / 2, 40);
+    }
+
     function checkGoal() {
         if(state.ball.outOfBoundsLeft) {
+            state.score.p2++;
             resetGameState();
         }
         else if(state.ball.outOfBoundsRight) {
+            state.score.p1++;
             resetGameState();
         }
     }
 
     // PADDLE
+    function getComputerMovement(paddle, ball) {
+        var paddleCenter = paddle.y + (paddle.height / 2);
+        var awarenessRange = paddle.height / 3;
+        var moveAmount = 10;
+        if(paddleCenter < ball.y - awarenessRange) {
+            paddle.y += moveAmount;
+        }
+        else if(paddleCenter > ball.y + awarenessRange){
+            paddle.y -= moveAmount;
+        }
+    }
 
     function drawPaddle(paddle) {
+        if(debug) {
+            ctx.fillStyle = 'rgba(255,0,0,0.5)';
+            ctx.fillRect(
+                paddle.x, 
+                paddle.y - (paddle.height * paddle.hitBoxHeightRatio), 
+                paddle.width, 
+                paddle.height + (paddle.height * paddle.hitBoxHeightRatio * 2)
+            );
+        }
+
         ctx.fillStyle = paddle.color;
         ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
     }
@@ -200,16 +249,15 @@ function pong() {
         if(ballYOutOfBounds) {
             ball.speedY = -ball.speedY;
             
-            if(ball.speedY < 0 && ball.speedY > (-ball.maxSpeedY)) {
-                ball.speedY -= ball.speedYIncrease;
-            }
-            else if(ball.speedY < ball.maxSpeedY) {
-                ball.speedY += ball.speedYIncrease;
-            }
+            // if(ball.speedY < 0 && ball.speedY > (-ball.maxSpeedY)) {
+            //     ball.speedY -= ball.speedYIncrease;
+            // }
+            // else if(ball.speedY < ball.maxSpeedY) {
+            //     ball.speedY += ball.speedYIncrease;
+            // }
         }
 
-        ball.x += ball.speedX;
-        ball.y += ball.speedY;
+        
 
         // if(ball.x > c.width) {
         //     ball.x = c.width - ball.radius;
@@ -230,22 +278,44 @@ function pong() {
 
 
         // Paddle detection
-        var leftPaddle = state.leftPaddle;
-        var rightPaddle = state.rightPaddle;
-        var leftPaddleRect = getPaddleBoundingRect(leftPaddle);
-        var rightPaddleRect = getPaddleBoundingRect(rightPaddle);
+        var p1Paddle = state.p1.paddle;
+        var p2Paddle = state.p2.paddle;
+        var p1PaddleRect = getPaddleBoundingRect(p1Paddle);
+        var p1PaddleHitBoxHeight = p1Paddle.height * p1Paddle.hitBoxHeightRatio;
+        var p2PaddleRect = getPaddleBoundingRect(p2Paddle);
+        var ballHitP1Paddle;
+        var ballHitP2Paddle;
+        
+        var onBallHitPaddle = function(paddle, paddleEdge, offset) {
+            var deltaY = ball.y - (paddle.y + (paddle.height / 2));
+            ball.speedY = deltaY * 0.3;
 
-        if(ballLeft < leftPaddleRect.right && ballTop > leftPaddleRect.top && ballBottom < leftPaddleRect.bottom) {
-            console.log('ball hit');
+            if(ball.speedY > ball.maxSpeedY) {
+                ball.speedY = ball.maxSpeedY;
+            }
+
             ball.speedX = -ball.speedX;
-            ball.x = leftPaddleRect.right + ball.radius;
+            // Make sure the ball is outside the paddle edge
+            ball.x = paddleEdge + offset;
+        };
+        
+        // Set hitbox height
+        p1PaddleRect.top -= p1PaddleHitBoxHeight;
+        p1PaddleRect.bottom += p1PaddleHitBoxHeight;
+
+        ballHitP1Paddle = ballLeft < p1PaddleRect.right && ballTop > p1PaddleRect.top && ballBottom < p1PaddleRect.bottom;
+        ballHitP2Paddle = ballRight > p2PaddleRect.left && ballTop > p2PaddleRect.top && ballBottom < p2PaddleRect.bottom;
+        
+
+        if(ballHitP1Paddle) {
+            onBallHitPaddle(p1Paddle, p1PaddleRect.right, ball.radius);
+        }
+        else if(ballHitP2Paddle) {
+            onBallHitPaddle(p2Paddle, p2PaddleRect.left, -ball.radius);
         }
 
-        if(ballRight > rightPaddleRect.left && ballTop > rightPaddleRect.top && ballBottom < rightPaddleRect.bottom) {
-            console.log('ball hit');
-            ball.speedX = -ball.speedX;
-            ball.x = rightPaddleRect.left - ball.radius;
-        }
+        ball.x += ball.speedX;
+        ball.y += ball.speedY;
 
         state.ball = ball;
     }
