@@ -5,7 +5,18 @@ function pong() {
     var settings = {
         debug: false,
         fps: 60,
-        winningScore: 5
+        winningScore: 5,
+        ballPauseDuration: 1000,
+        font: {
+            style: 'normal',
+            variant: 'normal',
+            weight: 'normal',
+            size: 20,
+            family: 'PressStart2P',
+            color: 'white',
+            textAlign: 'center',
+            padding: 10,
+        }
     };
 
     var initialState = {
@@ -55,7 +66,9 @@ function pong() {
             p1: 0,
             p2: 0
         },
-        showingWinScreen: false
+        showingWinScreen: false,
+        showingWelcomeMessage: false,
+        ballPaused: true
     };
 
     function deepClone(obj) {
@@ -71,6 +84,7 @@ function pong() {
     }
 
     function start() {
+        state.showingWelcomeMessage = true;
         registerEventHandlers();
         resetGameState();
         draw();
@@ -80,6 +94,21 @@ function pong() {
             updateScore();
             draw();
         }, 1000 / settings.fps);
+    }
+
+    function setFont(font) {
+        font = font || {};
+        var style = font.style || settings.font.style; 
+        var variant = font.variant || settings.font.variant;
+        var weight = font.weight || settings.font.weight;
+        var size = font.size || settings.font.size;
+        var family = font.family || settings.font.family;
+        var color = font.color || settings.font.color;
+        var textAlign = font.textAlign || settings.font.textAlign;
+
+        ctx.fillStyle = color;
+        ctx.textAlign = textAlign;
+        ctx.font = [style, variant, weight, size + 'px', family].join(' ');
     }
 
     function registerEventHandlers() {
@@ -124,7 +153,7 @@ function pong() {
         }
 
         function onClick(e) {
-            if(state.showingWinScreen) {
+            if(state.showingWinScreen || state.showingWelcomeMessage) {
                 restartGame();
             }
         }
@@ -143,6 +172,12 @@ function pong() {
             ball.speedY = 0;
         }
 
+        // Pause ball 
+        state.ballPaused = true;
+        setTimeout(function() { 
+            state.ballPaused = false;
+        }, settings.ballPauseDuration);
+
         state.ball = ball;
     }
 
@@ -152,19 +187,19 @@ function pong() {
         state.p2.isWinner = false;
         state.score = deepClone(initialState.score);
         state.showingWinScreen = false;
+        state.showingWelcomeMessage = false;
     }
 
-    function resetMouse() {
-        var oldMouse = deepClone(state.mouse);
+    function resetMouse(oldMouse) {
         state.mouse.x = oldMouse.x;
         state.mouse.y = oldMouse.y;
     }
 
-    function resetPaddles() {
-        state.p1.paddle.x = state.p1.paddle.padding;
-        state.p1.paddle.y = getPaddlePositionByMouse(state.p1.paddle, state.mouse);
+    function resetPaddles(oldState) {
+        state.p1.paddle.x = oldState.p1.paddle.padding;
+        state.p1.paddle.y = getPaddlePositionByMouse(oldState.p1.paddle, oldState.mouse);
 
-        state.p2.paddle.x = c.width + state.p2.paddle.padding - initialState.p2.paddle.width;
+        state.p2.paddle.x = c.width + oldState.p2.paddle.padding - initialState.p2.paddle.width;
         state.p2.paddle.y = c.height / 2 - (initialState.p2.paddle.height / 2);
     }
 
@@ -172,19 +207,22 @@ function pong() {
         var oldState = deepClone(state);
         state = deepClone(initialState);
 
-        resetMouse();
+        resetMouse(oldState.mouse);
         resetBall();
-        resetPaddles();
+        resetPaddles(oldState);
 
         state.score = oldState.score;
         state.p1.isWinner = oldState.p1.isWinner;
         state.p2.isWinner = oldState.p2.isWinner;
         state.showingWinScreen = oldState.showingWinScreen;
+        state.showingWelcomeMessage = oldState.showingWelcomeMessage;
     }
 
     function move() {
         if(!state.showingWinScreen) {
-            moveBall();
+            if(!state.ballPaused) {
+                moveBall();
+            }
             movePaddle(state.p1.paddle, state.mouse);
             getComputerMovement(state.p2.paddle, state.ball);
         }
@@ -193,7 +231,10 @@ function pong() {
     function draw() {
         drawCanvas();
 
-        if(state.showingWinScreen) {
+        if(state.showingWelcomeMessage) {
+            drawWelcomeMessage();
+        }
+        else if(state.showingWinScreen) {
             drawWinner();
         }
         else {
@@ -208,6 +249,26 @@ function pong() {
     function drawCanvas() {
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, c.width, c.height);
+    }
+
+    function drawWelcomeMessage() {
+        var messages = [
+            'Welcome to Ping Pong', 
+            'First player that gets ' + settings.winningScore + ' points wins',
+            'Click to start'
+        ];
+        var fontSize = settings.font.size;
+        var padding = settings.font.padding;
+
+        var startY = (c.height / 2) - ((messages.length * (fontSize + padding)) / 2);
+        var x = c.width / 2;
+        
+        setFont();
+
+        messages.forEach(function(message) {
+            ctx.fillText(message, x, startY, c.width);
+            startY += fontSize + padding;
+        });
     }
 
     function drawNet() {
@@ -251,9 +312,7 @@ function pong() {
     }
 
     function drawScore(score) {
-        ctx.fillStyle = 'white';
-        ctx.font = '30px Arial';
-        ctx.textAlign = 'center';
+        setFont({ size: 20 });
         ctx.fillText(score.p1 + '       ' + score.p2, c.width / 2, 40);
     }
 
@@ -268,13 +327,9 @@ function pong() {
         }
 
         if(message) {
-            ctx.fillStyle = 'white';
-            ctx.font = '40px Arial';
-            ctx.textAlign = 'center';
+            setFont();
             ctx.fillText(message, c.width / 2, c.height / 2, c.width);
-
-            ctx.font = '30px Arial';
-            ctx.fillText('Click to play again', c.width / 2, (c.height / 2) + 35, c.width);
+            ctx.fillText('Click to play again', c.width / 2, (c.height / 2) + settings.font.size + settings.font.padding, c.width);
         }
     }
 
@@ -352,7 +407,18 @@ function pong() {
     }
 
     function movePaddle(paddle, mouse) {
+        var paddleRect;
+        
         paddle.y = getPaddlePositionByMouse(paddle, mouse).y;
+        
+        paddleRect = getPaddleBoundingRect(paddle);
+
+        if(paddleRect.top < 0) {
+            paddle.y = 0;
+        }
+        else if(paddleRect.bottom > c.height) {
+            paddle.y = c.height - paddle.height;
+        }
     }
 
     // BALL
