@@ -1,8 +1,12 @@
 function pong() {
     var c;
     var ctx;
-    var fps = 60;
-    var debug = false;
+
+    var settings = {
+        debug: false,
+        fps: 60,
+        winningScore: 5
+    };
 
     var initialState = {
         mouse: {
@@ -48,7 +52,6 @@ function pong() {
             isWinner: false
         },
         score: {
-            winningScore: 5,
             p1: 0,
             p2: 0
         },
@@ -76,7 +79,7 @@ function pong() {
             move();
             updateScore();
             draw();
-        }, 1000 / fps);
+        }, 1000 / settings.fps);
     }
 
     function registerEventHandlers() {
@@ -99,10 +102,9 @@ function pong() {
         });
 
         function onWindowResize() {
-            var width = document.body.clientWidth;
-            var height = document.body.clientHeight;
-            c.width = width;
-            c.height = height;
+            c.width = document.body.clientWidth;
+            c.height = document.body.clientHeight;
+            resetGameState();
         }
 
         function onTouch(e) {
@@ -136,7 +138,7 @@ function pong() {
         ball.speedX *= Math.random() > 0.5 ? -1 : 1;
         ball.speedY *= Math.random() > 0.5 ? -1 : 1;
 
-        if(debug) {
+        if(settings.debug) {
             ball.speedX = -5
             ball.speedY = 0;
         }
@@ -283,8 +285,8 @@ function pong() {
         if(scoreChanged) {
             state.score = score;
 
-            state.p1.isWinner = score.p1 >= score.winningScore;
-            state.p2.isWinner = score.p2 >= score.winningScore;
+            state.p1.isWinner = score.p1 >= settings.winningScore;
+            state.p2.isWinner = score.p2 >= settings.winningScore;
             
             state.showingWinScreen = state.p1.isWinner === true || state.p2.isWinner === true;
 
@@ -319,7 +321,7 @@ function pong() {
     }
 
     function drawPaddle(paddle) {
-        if(debug) {
+        if(settings.debug) {
             ctx.fillStyle = 'rgba(255,0,0,0.5)';
             ctx.fillRect(
                 paddle.x, 
@@ -379,7 +381,6 @@ function pong() {
         var ballBottomOut = withinRange(ballTop, 0, c.height) && !withinRange(ballBottom, 0, c.height);
         var ballLeftOut = withinRange(ballRight, 0, c.width) && !withinRange(ballLeft, 0, c.width);
 
-        //var ballXOutOfBounds = ballLeftOut || ballRightOut;
         var ballYOutOfBounds = ballTopOut || ballBottomOut; 
 
         if(ballLeftOut) {
@@ -388,18 +389,6 @@ function pong() {
         if(ballRightOut) {
             ball.outOfBoundsRight = true;
         }
-
-        // if(ballXOutOfBounds) {
-
-        //     ball.speedX = -ball.speedX;
-
-        //     if(ball.speedX < 0 && ball.speedX > (-ball.maxSpeedX)) {
-        //         ball.speedX -= ball.speedXIncrease;
-        //     }
-        //     else if(ball.speedX < ball.maxSpeedX) {
-        //         ball.speedX += ball.speedXIncrease;
-        //     }
-        // }
 
         if(ballTopOut) {
             ball.y = ball.radius;
@@ -410,25 +399,9 @@ function pong() {
 
         if(ballYOutOfBounds) {
             ball.speedY = -ball.speedY;
-            
-            // if(ball.speedY < 0 && ball.speedY > (-ball.maxSpeedY)) {
-            //     ball.speedY -= ball.speedYIncrease;
-            // }
-            // else if(ball.speedY < ball.maxSpeedY) {
-            //     ball.speedY += ball.speedYIncrease;
-            // }
         }
 
         
-
-        // if(ball.x > c.width) {
-        //     ball.x = c.width - ball.radius;
-        //     ball.speedX = -ball.speedX;
-        // }
-        // if(ball.x < 0) {
-        //     ball.x = ball.radius;
-        //     ball.speedX = -ball.speedX;
-        // }
         if(ball.y > c.height) {
             ball.y = c.height - ball.radius;
             ball.speedY = -ball.speedY;
