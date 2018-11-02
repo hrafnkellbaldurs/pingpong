@@ -80,31 +80,52 @@ function pong() {
     }
 
     function registerEventHandlers() {
+        
+        // Resize
+        window.addEventListener('resize', onWindowResize);
+        onWindowResize();
+
+        // Mouse/touch input
+        c.addEventListener('mousemove', function(e) {
+            onMouseMove(e.clientX, e.clientY);
+        });
+        c.addEventListener('touchmove', onTouch);
+
+        // Click/tap input
+        c.addEventListener('click', onClick);
+        c.addEventListener('touchstart', function(e) {
+            onTouch(e);
+            onClick();
+        });
+
         function onWindowResize() {
             var width = document.body.clientWidth;
             var height = document.body.clientHeight;
             c.width = width;
             c.height = height;
         }
-        window.addEventListener('resize', onWindowResize);
-        onWindowResize();
-        
-        
-        c.addEventListener('mousemove', function(e) {
+
+        function onTouch(e) {
+            var touch = e.touches[0];
+            onMouseMove(touch.clientX, touch.clientY);
+            e.preventDefault();
+        }
+
+        function onMouseMove(x, y) {
             var rect = c.getBoundingClientRect();
             var documentElement = document.documentElement;
-            var mouseX = e.clientX - rect.left - documentElement.scrollLeft;
-            var mouseY = e.clientY - rect.top - documentElement.scrollTop;
+            var mouseX = x - rect.left - documentElement.scrollLeft;
+            var mouseY = y - rect.top - documentElement.scrollTop;
             
             state.mouse.x = mouseX;
             state.mouse.y = mouseY;
-        });
+        }
 
-        c.addEventListener('click', function(e) {
+        function onClick(e) {
             if(state.showingWinScreen) {
                 restartGame();
             }
-        });
+        }
     }
 
     function resetBall() {
